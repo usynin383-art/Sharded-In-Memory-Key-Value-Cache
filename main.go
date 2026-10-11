@@ -160,7 +160,7 @@ func handleClient(conn net.Conn, cache *ShardedCache) {
 		}
 		parts := strings.Fields(input)
 		command := strings.ToUpper(parts[0])
-		if len(parts) < 3 {
+		if len(parts) < 2 {
 			fmt.Fprintln(conn, "переданы некорректные аргументы")
 			continue
 		}
@@ -183,7 +183,7 @@ func handleClient(conn net.Conn, cache *ShardedCache) {
 				}
 			}
 			cache.Set(parts[1], parts[2], ttl)
-			fmt.Fprint(conn, "+OK")
+			fmt.Fprintln(conn, "+OK")
 
 		case "DELETE":
 			cache.Delete(parts[1])

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -129,6 +131,50 @@ func BenchmarkShardedCache(b *testing.B) {
 			i++
 			cache.Set(key, "value", 0)
 			_, _ = cache.Get(key)
+		}
+	})
+}
+
+//-----------------------------------------------------
+//server side tests and benchmarks
+
+func TestHandleClient_GET_SET(t *testing.T) {
+	cache := NewShardedCache(4)
+	defer cache.Close()
+
+	serverConn, clientConn := net.Pipe()
+	defer clientConn.Close()
+
+	go handleClient(serverConn, cache)
+
+	clientReader := bufio.NewReader(clientConn)
+
+	fmt.Fprintln(clientConn, "SET key123 value123")
+	setResponse, _ := clientReader.ReadString('\n')
+	assert.Equal(t, "+OK\n", setResponse)
+
+	fmt.Fprintln(clientConn, "GET key123")
+	getResponse, _ := clientReader.ReadString('\n')
+	assert.Equal(t, "value123\n", getResponse)
+}
+
+func BenchmarkHandleClient_Parallel(b *testing.B) {
+	cache := NewShardedCache(32)
+	defer cache.Close()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		serverConn, clientConn := net.Pipe()
+		defer clientConn.Close()
+
+		go handleClient(serverConn, cache)
+		clientReader := bufio.NewReader(clientConn)
+
+		for pb.Next() {
+			fmt.Fprintln(clientConn, "SET benchmarkKey value 0")
+			_, _ = clientReader.ReadString('\n')
 		}
 	})
 }
